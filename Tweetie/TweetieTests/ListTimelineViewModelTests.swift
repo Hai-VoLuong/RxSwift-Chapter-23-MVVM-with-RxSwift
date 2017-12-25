@@ -34,6 +34,37 @@ class ListTimelineViewModelTests: XCTestCase {
     XCTAssertFalse(viewModel.paused)
   }
 
+    func test_whenAccountAvailable_updatesAccountStatus() {
+        let asyncExpect = expectation(description: "fullfill test")
+        let scheduler = TestScheduler(initialClock: 0)
+        let observer = scheduler.createObserver(Bool.self)
+
+        let accountSubject = PublishSubject<TwitterAccount.AccountStatus>()
+        let viewModel = createViewModel(accountSubject.asDriver(onErrorJustReturn: .unavailable))
+
+        let bag = DisposeBag()
+        let loggedIn = viewModel.loggedIn.asObservable().share()
+
+        loggedIn
+        .subscribe(observer)
+        .addDisposableTo(bag)
+
+        loggedIn
+        .subscribe(onCompleted: asyncExpect.fulfill)
+        .addDisposableTo(bag)
+
+        accountSubject.onNext(.authorized(TestData.account))
+        accountSubject.onNext(.unavailable)
+        accountSubject.onCompleted()
+
+        waitForExpectations(timeout: 1.0, handler: { error in
+            XCTAssert((error != nil), error!.localizedDescription)
+            let expectedEvents = [next(0, true), next(0, false), completed(0)]
+            XCTAssertEqual(observer.events, expectedEvents)
+        })
+
+    }
+
   func test_whenInitialized_bindsTweets() {
     let asyncExpect = expectation(description: "fullfill test")
 
